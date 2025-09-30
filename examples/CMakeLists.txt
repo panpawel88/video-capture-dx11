@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 # Simple player example
-add_executable(simple_player
+add_executable(simple_player WIN32
     simple_player.cpp
 )
 
