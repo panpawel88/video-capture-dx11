@@ -209,6 +209,8 @@ Hardware decoding provides:
 
 This library is extracted from the dual-stream video player reference implementation.
 
+Based on: https://github.com/panpawel88/dual-stream
+
 ## Comparison with OpenCV
 
 | Feature | OpenCV VideoCapture | This Library |
