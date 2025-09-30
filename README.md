@@ -1,5 +1,7 @@
 # VideoCaptureDX11
 
+> **⚠️ Note:** This project is still under development and has not been thoroughly tested yet.
+
 A simplified OpenCV-like VideoCapture library for Windows that provides hardware-accelerated H.264/H.265 video decoding with DirectX 11 texture output.
 
 ## Features
