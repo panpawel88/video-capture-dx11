@@ -126,6 +126,19 @@ set_target_properties(VideoCaptureDX11 PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 )
 
+# Function to copy VideoCaptureDX11 runtime dependencies (FFmpeg DLLs) to executable output directory
+function(copy_videocapture_dependencies target_name)
+    if(WIN32)
+        file(GLOB FFMPEG_DLLS "${FFMPEG_BIN_DIR}/*.dll")
+        foreach(DLL ${FFMPEG_DLLS})
+            add_custom_command(TARGET ${target_name} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${DLL}" $<TARGET_FILE_DIR:${target_name}>
+            )
+        endforeach()
+    endif()
+endfunction()
+
 # Example application (optional)
 option(BUILD_EXAMPLES "Build example application" ON)
 
@@ -141,10 +154,6 @@ install(TARGETS VideoCaptureDX11
 )
 
 install(FILES include/VideoCapture.h DESTINATION include)
-
-# Copy FFmpeg DLLs to output directory
-file(GLOB FFMPEG_DLLS "${FFMPEG_BIN_DIR}/*.dll")
-file(COPY ${FFMPEG_DLLS} DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
 message(STATUS "VideoCaptureDX11 library configuration complete")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")

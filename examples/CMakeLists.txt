@@ -17,4 +17,7 @@ set_target_properties(simple_player PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
 
+# Copy VideoCaptureDX11 runtime dependencies (FFmpeg DLLs)
+copy_videocapture_dependencies(simple_player)
+
 message(STATUS "Example application configured: simple_player")
