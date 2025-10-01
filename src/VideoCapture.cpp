@@ -87,6 +87,49 @@ bool VideoCapture::open(const std::string& filename) {
     return true;
 }
 
+bool VideoCapture::open(IDataSource* dataSource, const std::string& format) {
+    if (!s_initialized) {
+        LOG_ERROR("VideoCapture::Initialize() must be called before opening data sources");
+        return false;
+    }
+
+    if (!dataSource) {
+        LOG_ERROR("Invalid data source");
+        return false;
+    }
+
+    // Close any previously opened source
+    release();
+
+    // Create demuxer
+    m_demuxer = std::make_unique<VideoDemuxer>();
+    if (!m_demuxer->Open(dataSource, format)) {
+        LOG_ERROR("Failed to open data source");
+        return false;
+    }
+
+    // Initialize decoder
+    if (!InitializeDecoder()) {
+        LOG_ERROR("Failed to initialize hardware decoder");
+        release();
+        return false;
+    }
+
+    // Calculate approximate frame count
+    double duration = m_demuxer->GetDuration();
+    double frameRate = m_demuxer->GetFrameRate();
+    if (duration > 0.0 && frameRate > 0.0) {
+        m_frameCount = static_cast<int64_t>(duration * frameRate);
+    } else {
+        m_frameCount = 0;
+    }
+
+    m_opened = true;
+    m_eof = false;
+    LOG_INFO("Data source opened successfully");
+    return true;
+}
+
 bool VideoCapture::read(ID3D11Texture2D** outTexture, bool& isYUV, DXGI_FORMAT& format) {
     if (!m_opened || m_eof) {
         return false;

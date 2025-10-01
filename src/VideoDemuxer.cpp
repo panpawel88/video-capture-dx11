@@ -1,9 +1,17 @@
 #include "VideoDemuxer.h"
+#include "IDataSource.h"
 #include "Logger.h"
 #include <iostream>
 
+extern "C" {
+#include <libavutil/error.h>
+}
+
 VideoDemuxer::VideoDemuxer()
     : m_formatContext(nullptr)
+    , m_ioContext(nullptr)
+    , m_dataSource(nullptr)
+    , m_ioBuffer(nullptr)
     , m_videoStreamIndex(-1)
     , m_videoStream(nullptr) {
 }
@@ -42,6 +50,51 @@ bool VideoDemuxer::Open(const std::string& filePath) {
     }
 
     LOG_INFO("Successfully opened video file: ", filePath);
+    LOG_INFO("  Resolution: ", GetWidth(), "x", GetHeight());
+    LOG_INFO("  Frame rate: ", GetFrameRate(), " FPS");
+    LOG_INFO("  Duration: ", GetDuration(), " seconds");
+    AVRational timebase = GetTimeBase();
+    LOG_INFO("  Timebase: ", timebase.num, "/", timebase.den,
+              " (", av_q2d(timebase), " seconds per unit)");
+
+    return true;
+}
+
+bool VideoDemuxer::Open(IDataSource* dataSource, const std::string& format) {
+    Close();
+
+    if (!dataSource) {
+        LOG_ERROR("Invalid data source");
+        return false;
+    }
+
+    m_dataSource = dataSource;
+
+    // Setup custom IO
+    if (!SetupCustomIO(dataSource, format)) {
+        LOG_ERROR("Failed to setup custom IO");
+        Close();
+        return false;
+    }
+
+    // Retrieve stream information
+    int ret = avformat_find_stream_info(m_formatContext, nullptr);
+    if (ret < 0) {
+        char errorBuf[AV_ERROR_MAX_STRING_SIZE];
+        av_strerror(ret, errorBuf, sizeof(errorBuf));
+        LOG_ERROR("Cannot find stream info: ", errorBuf);
+        Close();
+        return false;
+    }
+
+    // Find video stream
+    if (!FindVideoStream()) {
+        LOG_ERROR("No video stream found");
+        Close();
+        return false;
+    }
+
+    LOG_INFO("Successfully opened video from custom data source");
     LOG_INFO("  Resolution: ", GetWidth(), "x", GetHeight());
     LOG_INFO("  Frame rate: ", GetFrameRate(), " FPS");
     LOG_INFO("  Duration: ", GetDuration(), " seconds");
@@ -228,12 +281,121 @@ bool VideoDemuxer::FindVideoStream() {
     return false;
 }
 
+bool VideoDemuxer::SetupCustomIO(IDataSource* dataSource, const std::string& format) {
+    const size_t IO_BUFFER_SIZE = 32768; // 32KB buffer
+
+    // Allocate IO buffer
+    m_ioBuffer = static_cast<uint8_t*>(av_malloc(IO_BUFFER_SIZE));
+    if (!m_ioBuffer) {
+        LOG_ERROR("Failed to allocate IO buffer");
+        return false;
+    }
+
+    // Create AVIOContext with custom callbacks
+    m_ioContext = avio_alloc_context(
+        m_ioBuffer,
+        IO_BUFFER_SIZE,
+        0,                          // write_flag (0 = read-only)
+        dataSource,                 // opaque user data
+        &VideoDemuxer::ReadPacket,  // read_packet callback
+        nullptr,                    // write_packet callback
+        &VideoDemuxer::Seek         // seek callback
+    );
+
+    if (!m_ioContext) {
+        LOG_ERROR("Failed to allocate AVIOContext");
+        av_free(m_ioBuffer);
+        m_ioBuffer = nullptr;
+        return false;
+    }
+
+    // Allocate format context
+    m_formatContext = avformat_alloc_context();
+    if (!m_formatContext) {
+        LOG_ERROR("Failed to allocate AVFormatContext");
+        return false;
+    }
+
+    // Assign custom IO context
+    m_formatContext->pb = m_ioContext;
+    m_formatContext->flags |= AVFMT_FLAG_CUSTOM_IO;
+
+    // Determine input format
+    const AVInputFormat* inputFormat = nullptr;
+    if (!format.empty()) {
+        inputFormat = av_find_input_format(format.c_str());
+        if (!inputFormat) {
+            LOG_WARNING("Could not find input format: ", format);
+        }
+    }
+
+    // Open input (with empty filename for custom IO)
+    int ret = avformat_open_input(&m_formatContext, "", inputFormat, nullptr);
+    if (ret < 0) {
+        char errorBuf[AV_ERROR_MAX_STRING_SIZE];
+        av_strerror(ret, errorBuf, sizeof(errorBuf));
+        LOG_ERROR("Cannot open custom input: ", errorBuf);
+        return false;
+    }
+
+    LOG_DEBUG("Custom IO setup complete");
+    return true;
+}
+
 void VideoDemuxer::Reset() {
     if (m_formatContext) {
         avformat_close_input(&m_formatContext);
         m_formatContext = nullptr;
     }
 
+    if (m_ioContext) {
+        // Note: ioContext->buffer is freed by avformat_close_input if the context was used
+        // If not, we need to free it manually
+        if (m_ioBuffer) {
+            av_freep(&m_ioContext->buffer);
+        }
+        avio_context_free(&m_ioContext);
+        m_ioContext = nullptr;
+    }
+
+    if (m_ioBuffer) {
+        // Already freed by avio_context_free or avformat_close_input
+        m_ioBuffer = nullptr;
+    }
+
+    m_dataSource = nullptr;
     m_videoStreamIndex = -1;
     m_videoStream = nullptr;
+}
+
+int VideoDemuxer::ReadPacket(void* opaque, uint8_t* buf, int buf_size) {
+    IDataSource* dataSource = static_cast<IDataSource*>(opaque);
+    if (!dataSource) {
+        return AVERROR(EIO);
+    }
+
+    int bytesRead = dataSource->Read(buf, buf_size);
+    if (bytesRead < 0) {
+        // Return FFmpeg error code
+        return bytesRead;
+    }
+    if (bytesRead == 0) {
+        // End of file
+        return AVERROR_EOF;
+    }
+
+    return bytesRead;
+}
+
+int64_t VideoDemuxer::Seek(void* opaque, int64_t offset, int whence) {
+    IDataSource* dataSource = static_cast<IDataSource*>(opaque);
+    if (!dataSource) {
+        return AVERROR(EIO);
+    }
+
+    if (!dataSource->IsSeekable()) {
+        return AVERROR(ENOSYS);
+    }
+
+    return dataSource->Seek(offset, whence);
 }

@@ -91,6 +91,8 @@ set(LIBRARY_SOURCES
     src/HardwareDecoder.cpp
     src/Logger.cpp
     src/FFmpegInitializer.cpp
+    src/FileDataSource.cpp
+    src/BufferDataSource.cpp
 )
 
 set(LIBRARY_HEADERS
@@ -100,6 +102,9 @@ set(LIBRARY_HEADERS
     src/HardwareDecoder.h
     src/Logger.h
     src/FFmpegInitializer.h
+    src/IDataSource.h
+    src/FileDataSource.h
+    src/BufferDataSource.h
 )
 
 # Create static library

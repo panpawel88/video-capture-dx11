@@ -12,6 +12,7 @@ using Microsoft::WRL::ComPtr;
 class VideoDemuxer;
 class VideoDecoder;
 struct DecodedFrame;
+class IDataSource;
 
 // OpenCV-compatible property IDs
 enum VideoCaptureProperties {
@@ -35,6 +36,10 @@ public:
 
     // Open video file (returns false if hardware decode not available)
     bool open(const std::string& filename);
+
+    // Open video from custom data source (memory buffer, network stream, etc.)
+    // format parameter is optional, e.g., "mp4", "matroska", "h264"
+    bool open(IDataSource* dataSource, const std::string& format = "");
 
     // Read next frame (returns DX11 texture, always YUV format from hardware)
     // Returns false if no more frames or error occurred
