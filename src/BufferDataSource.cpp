@@ -5,6 +5,7 @@
 
 extern "C" {
 #include <libavutil/error.h>
+#include <libavformat/avio.h>
 }
 
 BufferDataSource::BufferDataSource()
