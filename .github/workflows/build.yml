@@ -13,6 +13,7 @@ jobs:
     strategy:
       matrix:
         build_type: [Debug, Release]
+        webrtc_support: [OFF, ON]
 
     steps:
     - name: Checkout code
@@ -23,7 +24,7 @@ jobs:
 
     - name: Configure CMake
       run: |
-        cmake -B build -G "Visual Studio 17 2022" -A x64 -DBUILD_EXAMPLES=ON
+        cmake -B build -G "Visual Studio 17 2022" -A x64 -DBUILD_EXAMPLES=ON -DBUILD_WEBRTC_SUPPORT=${{ matrix.webrtc_support }}
 
     - name: Build
       run: cmake --build build --config ${{ matrix.build_type }}
@@ -31,7 +32,7 @@ jobs:
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: VideoCaptureDX11-${{ matrix.build_type }}
+        name: VideoCaptureDX11-${{ matrix.build_type }}-WebRTC-${{ matrix.webrtc_support }}
         path: |
           build/lib/
           build/bin/

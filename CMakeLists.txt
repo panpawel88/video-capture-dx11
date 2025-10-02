@@ -148,8 +148,37 @@ endfunction()
 option(BUILD_WEBRTC_SUPPORT "Build with WebRTC streaming support (requires libdatachannel)" OFF)
 
 if(BUILD_WEBRTC_SUPPORT)
-    # Try to find libdatachannel via vcpkg or system
+    # Try to find libdatachannel via vcpkg or system first
     find_package(LibDataChannel QUIET)
+
+    if(NOT LibDataChannel_FOUND)
+        message(STATUS "libdatachannel not found via find_package, attempting FetchContent...")
+
+        # Download and build libdatachannel via FetchContent
+        FetchContent_Declare(
+            libdatachannel
+            GIT_REPOSITORY https://github.com/paullouisageneau/libdatachannel.git
+            GIT_TAG v0.23.2  # Use stable release
+            GIT_SHALLOW TRUE
+        )
+
+        # Configure libdatachannel options
+        set(NO_EXAMPLES ON CACHE BOOL "" FORCE)
+        set(NO_TESTS ON CACHE BOOL "" FORCE)
+        set(NO_MEDIA OFF CACHE BOOL "" FORCE)  # We need media support for H264RtpDepacketizer
+        set(NO_WEBSOCKET ON CACHE BOOL "" FORCE)
+
+        FetchContent_MakeAvailable(libdatachannel)
+
+        # Create alias for consistent target naming
+        if(TARGET datachannel-static)
+            add_library(LibDataChannel::LibDataChannel ALIAS datachannel-static)
+            set(LibDataChannel_FOUND TRUE)
+        elseif(TARGET datachannel)
+            add_library(LibDataChannel::LibDataChannel ALIAS datachannel)
+            set(LibDataChannel_FOUND TRUE)
+        endif()
+    endif()
 
     if(LibDataChannel_FOUND)
         message(STATUS "libdatachannel found - WebRTC support enabled")
@@ -158,7 +187,7 @@ if(BUILD_WEBRTC_SUPPORT)
         target_link_libraries(VideoCaptureDX11 PUBLIC LibDataChannel::LibDataChannel)
         target_compile_definitions(VideoCaptureDX11 PUBLIC WEBRTC_SUPPORT_ENABLED)
     else()
-        message(WARNING "libdatachannel not found - WebRTC support disabled. Install via: vcpkg install libdatachannel")
+        message(WARNING "Failed to fetch libdatachannel - WebRTC support disabled")
         set(BUILD_WEBRTC_SUPPORT OFF CACHE BOOL "Build with WebRTC streaming support (requires libdatachannel)" FORCE)
     endif()
 endif()
