@@ -170,13 +170,10 @@ if(BUILD_WEBRTC_SUPPORT)
 
         FetchContent_MakeAvailable(libdatachannel)
 
-        # Create alias for consistent target naming
-        if(TARGET datachannel-static)
-            add_library(LibDataChannel::LibDataChannel ALIAS datachannel-static)
+        # Check which target was created and set Found flag
+        if(TARGET datachannel-static OR TARGET datachannel OR TARGET LibDataChannel::LibDataChannel)
             set(LibDataChannel_FOUND TRUE)
-        elseif(TARGET datachannel)
-            add_library(LibDataChannel::LibDataChannel ALIAS datachannel)
-            set(LibDataChannel_FOUND TRUE)
+            message(STATUS "libdatachannel fetched successfully via FetchContent")
         endif()
     endif()
 
@@ -184,7 +181,16 @@ if(BUILD_WEBRTC_SUPPORT)
         message(STATUS "libdatachannel found - WebRTC support enabled")
         list(APPEND LIBRARY_SOURCES src/WebRTCDataSource.cpp)
         list(APPEND LIBRARY_HEADERS src/WebRTCDataSource.h)
-        target_link_libraries(VideoCaptureDX11 PUBLIC LibDataChannel::LibDataChannel)
+
+        # Link to the correct target (try different variations)
+        if(TARGET LibDataChannel::LibDataChannel)
+            target_link_libraries(VideoCaptureDX11 PUBLIC LibDataChannel::LibDataChannel)
+        elseif(TARGET datachannel-static)
+            target_link_libraries(VideoCaptureDX11 PUBLIC datachannel-static)
+        elseif(TARGET datachannel)
+            target_link_libraries(VideoCaptureDX11 PUBLIC datachannel)
+        endif()
+
         target_compile_definitions(VideoCaptureDX11 PUBLIC WEBRTC_SUPPORT_ENABLED)
     else()
         message(WARNING "Failed to fetch libdatachannel - WebRTC support disabled")
