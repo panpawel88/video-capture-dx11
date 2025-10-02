@@ -179,8 +179,12 @@ if(BUILD_WEBRTC_SUPPORT)
 
     if(LibDataChannel_FOUND)
         message(STATUS "libdatachannel found - WebRTC support enabled")
-        list(APPEND LIBRARY_SOURCES src/WebRTCDataSource.cpp)
-        list(APPEND LIBRARY_HEADERS src/WebRTCDataSource.h)
+
+        # Add WebRTC sources to the library target
+        target_sources(VideoCaptureDX11 PRIVATE
+            src/WebRTCDataSource.cpp
+            src/WebRTCDataSource.h
+        )
 
         # Link to the correct target (try different variations)
         if(TARGET LibDataChannel::LibDataChannel)
