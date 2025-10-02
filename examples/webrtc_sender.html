@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Video Sender</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        video {
+            width: 100%;
+            max-width: 640px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            background: #000;
+        }
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover:not(:disabled) {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .section {
+            margin: 20px 0;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.waiting {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        label {
+            display: block;
+            margin: 10px 0 5px 0;
+            font-weight: bold;
+            color: #555;
+        }
+        .instructions {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            border-left: 4px solid #2196F3;
+        }
+        .instructions ol {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebRTC Video Sender to Native App</h1>
+
+        <div class="instructions">
+            <strong>Instructions:</strong>
+            <ol>
+                <li>Click "Start Camera" to enable your webcam or screen share</li>
+                <li>Run <code>webrtc_player.exe</code> on Windows</li>
+                <li>Copy the SDP offer from the native app's console</li>
+                <li>Paste it in the "Remote SDP" box below and click "Connect"</li>
+                <li>Copy the answer that appears and paste it back into the native app</li>
+            </ol>
+        </div>
+
+        <div id="status" class="status waiting">Status: Waiting...</div>
+
+        <div class="section">
+            <button id="startBtn">Start Camera</button>
+            <button id="screenBtn">Share Screen</button>
+            <button id="stopBtn" disabled>Stop</button>
+        </div>
+
+        <div class="section">
+            <video id="localVideo" autoplay muted playsinline></video>
+        </div>
+
+        <div class="section">
+            <label for="remoteSdp">Remote SDP (paste from webrtc_player.exe):</label>
+            <textarea id="remoteSdp" placeholder="Paste the SDP offer from the native application here..."></textarea>
+            <button id="connectBtn" disabled>Connect</button>
+        </div>
+
+        <div class="section">
+            <label for="localSdp">Local SDP (copy and paste into webrtc_player.exe):</label>
+            <textarea id="localSdp" readonly placeholder="Your SDP answer will appear here..."></textarea>
+        </div>
+    </div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const startBtn = document.getElementById('startBtn');
+        const screenBtn = document.getElementById('screenBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const connectBtn = document.getElementById('connectBtn');
+        const localVideo = document.getElementById('localVideo');
+        const remoteSdpTextarea = document.getElementById('remoteSdp');
+        const localSdpTextarea = document.getElementById('localSdp');
+
+        let localStream = null;
+        let peerConnection = null;
+
+        function setStatus(message, type = 'waiting') {
+            statusDiv.textContent = `Status: ${message}`;
+            statusDiv.className = `status ${type}`;
+        }
+
+        async function startCamera() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 1280, height: 720 },
+                    audio: false
+                });
+                localVideo.srcObject = localStream;
+                setStatus('Camera started', 'connected');
+                startBtn.disabled = true;
+                screenBtn.disabled = true;
+                stopBtn.disabled = false;
+                connectBtn.disabled = false;
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+                setStatus(`Error: ${err.message}`, 'error');
+            }
+        }
+
+        async function startScreen() {
+            try {
+                localStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { width: 1920, height: 1080 },
+                    audio: false
+                });
+                localVideo.srcObject = localStream;
+                setStatus('Screen sharing started', 'connected');
+                startBtn.disabled = true;
+                screenBtn.disabled = true;
+                stopBtn.disabled = false;
+                connectBtn.disabled = false;
+            } catch (err) {
+                console.error('Error accessing screen:', err);
+                setStatus(`Error: ${err.message}`, 'error');
+            }
+        }
+
+        function stopStream() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+                localVideo.srcObject = null;
+            }
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            setStatus('Stopped', 'waiting');
+            startBtn.disabled = false;
+            screenBtn.disabled = false;
+            stopBtn.disabled = true;
+            connectBtn.disabled = true;
+            remoteSdpTextarea.value = '';
+            localSdpTextarea.value = '';
+        }
+
+        async function connect() {
+            if (!localStream) {
+                setStatus('Error: No media stream available', 'error');
+                return;
+            }
+
+            const remoteSdp = remoteSdpTextarea.value.trim();
+            if (!remoteSdp) {
+                setStatus('Error: Please paste remote SDP first', 'error');
+                return;
+            }
+
+            try {
+                setStatus('Connecting...', 'waiting');
+
+                // Create peer connection
+                peerConnection = new RTCPeerConnection({
+                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                });
+
+                // Add video track
+                localStream.getVideoTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+
+                // ICE candidate handling
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate === null) {
+                        // All ICE candidates have been gathered
+                        console.log('ICE gathering complete');
+                    }
+                };
+
+                peerConnection.oniceconnectionstatechange = () => {
+                    console.log('ICE connection state:', peerConnection.iceConnectionState);
+                    if (peerConnection.iceConnectionState === 'connected') {
+                        setStatus('Connected to native app!', 'connected');
+                    } else if (peerConnection.iceConnectionState === 'disconnected') {
+                        setStatus('Disconnected', 'error');
+                    } else if (peerConnection.iceConnectionState === 'failed') {
+                        setStatus('Connection failed', 'error');
+                    }
+                };
+
+                // Set remote description (offer from native app)
+                await peerConnection.setRemoteDescription({
+                    type: 'offer',
+                    sdp: remoteSdp
+                });
+
+                // Create answer
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+
+                // Wait for ICE gathering to complete
+                await new Promise((resolve) => {
+                    if (peerConnection.iceGatheringState === 'complete') {
+                        resolve();
+                    } else {
+                        peerConnection.onicegatheringstatechange = () => {
+                            if (peerConnection.iceGatheringState === 'complete') {
+                                resolve();
+                            }
+                        };
+                    }
+                });
+
+                // Display local SDP (answer)
+                localSdpTextarea.value = peerConnection.localDescription.sdp;
+
+                setStatus('Answer created - copy SDP below and paste into native app', 'waiting');
+
+            } catch (err) {
+                console.error('Error connecting:', err);
+                setStatus(`Error: ${err.message}`, 'error');
+            }
+        }
+
+        startBtn.addEventListener('click', startCamera);
+        screenBtn.addEventListener('click', startScreen);
+        stopBtn.addEventListener('click', stopStream);
+        connectBtn.addEventListener('click', connect);
+    </script>
+</body>
+</html>

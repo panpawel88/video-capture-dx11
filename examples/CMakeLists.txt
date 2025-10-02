@@ -40,4 +40,28 @@ set_target_properties(stream_player PROPERTIES
 
 copy_videocapture_dependencies(stream_player)
 
-message(STATUS "Example applications configured: simple_player, stream_player")
+# WebRTC player example (requires BUILD_WEBRTC_SUPPORT=ON)
+if(BUILD_WEBRTC_SUPPORT)
+    add_executable(webrtc_player WIN32
+        webrtc_player.cpp
+    )
+
+    target_link_libraries(webrtc_player
+        PRIVATE
+            VideoCaptureDX11
+            d3d11.lib
+            dxgi.lib
+            d3dcompiler.lib
+    )
+
+    set_target_properties(webrtc_player PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    )
+
+    copy_videocapture_dependencies(webrtc_player)
+
+    message(STATUS "Example applications configured: simple_player, stream_player, webrtc_player")
+else()
+    message(STATUS "Example applications configured: simple_player, stream_player")
+    message(STATUS "  Note: webrtc_player requires BUILD_WEBRTC_SUPPORT=ON")
+endif()

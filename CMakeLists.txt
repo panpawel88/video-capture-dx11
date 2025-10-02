@@ -144,6 +144,25 @@ function(copy_videocapture_dependencies target_name)
     endif()
 endfunction()
 
+# Optional WebRTC support via libdatachannel
+option(BUILD_WEBRTC_SUPPORT "Build with WebRTC streaming support (requires libdatachannel)" OFF)
+
+if(BUILD_WEBRTC_SUPPORT)
+    # Try to find libdatachannel via vcpkg or system
+    find_package(LibDataChannel QUIET)
+
+    if(LibDataChannel_FOUND)
+        message(STATUS "libdatachannel found - WebRTC support enabled")
+        list(APPEND LIBRARY_SOURCES src/WebRTCDataSource.cpp)
+        list(APPEND LIBRARY_HEADERS src/WebRTCDataSource.h)
+        target_link_libraries(VideoCaptureDX11 PUBLIC LibDataChannel::LibDataChannel)
+        target_compile_definitions(VideoCaptureDX11 PUBLIC WEBRTC_SUPPORT_ENABLED)
+    else()
+        message(WARNING "libdatachannel not found - WebRTC support disabled. Install via: vcpkg install libdatachannel")
+        set(BUILD_WEBRTC_SUPPORT OFF CACHE BOOL "Build with WebRTC streaming support (requires libdatachannel)" FORCE)
+    endif()
+endif()
+
 # Example application (optional)
 option(BUILD_EXAMPLES "Build example application" ON)
 
