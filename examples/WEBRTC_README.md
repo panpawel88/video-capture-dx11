@@ -4,15 +4,14 @@ This example demonstrates real-time video streaming from a web browser to a nati
 
 ## Requirements
 
-- **libdatachannel**: Install via vcpkg
-  ```bash
-  vcpkg install libdatachannel
-  ```
+- **libdatachannel**: Automatically downloaded via CMake FetchContent (no manual installation needed!)
 - **Build with WebRTC support**:
   ```bash
   cmake -B build -DBUILD_WEBRTC_SUPPORT=ON
   cmake --build build --config Release
   ```
+
+> **Note**: The build system will automatically download and compile libdatachannel v0.23.2 from GitHub. No vcpkg or manual dependency installation required!
 
 ## Architecture
 
@@ -107,13 +106,17 @@ The `WebRTCDataSource` class implements the `IDataSource` interface and provides
 - Check that libdatachannel was found during CMake configure
 
 ### "libdatachannel not found"
+This should not happen with FetchContent, but if you encounter issues:
 ```bash
-# Install via vcpkg
-vcpkg install libdatachannel
+# Option 1: Let CMake auto-download (default)
+cmake -B build -DBUILD_WEBRTC_SUPPORT=ON
 
-# Point CMake to vcpkg toolchain
+# Option 2: Use vcpkg (alternative)
+vcpkg install libdatachannel
 cmake -B build -DBUILD_WEBRTC_SUPPORT=ON -DCMAKE_TOOLCHAIN_FILE=[vcpkg root]/scripts/buildsystems/vcpkg.cmake
 ```
+
+> The build system tries vcpkg first, then automatically falls back to FetchContent if not found.
 
 ### "Connection failed"
 - Check firewall settings (UDP ports may be blocked)
