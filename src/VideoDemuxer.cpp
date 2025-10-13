@@ -267,10 +267,10 @@ bool VideoDemuxer::FindVideoStream() {
             m_videoStreamIndex = i;
             m_videoStream = m_formatContext->streams[i];
 
-            // Validate codec support (H264/H265/AV1 only)
+            // Validate codec support (H264/H265 only)
             AVCodecID codecId = m_videoStream->codecpar->codec_id;
-            if (codecId != AV_CODEC_ID_H264 && codecId != AV_CODEC_ID_HEVC && codecId != AV_CODEC_ID_AV1) {
-                LOG_ERROR("Unsupported video codec found. Only H264, H265, and AV1 are supported.");
+            if (codecId != AV_CODEC_ID_H264 && codecId != AV_CODEC_ID_HEVC) {
+                LOG_ERROR("Unsupported video codec found. Only H264 and H265 are supported.");
                 return false;
             }
 

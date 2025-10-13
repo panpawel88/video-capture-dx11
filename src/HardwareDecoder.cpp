@@ -67,7 +67,7 @@ DecoderInfo HardwareDecoder::GetBestDecoder(AVCodecID codecId) {
 bool HardwareDecoder::SupportsCodec(const DecoderInfo& decoder, AVCodecID codecId) {
     switch (decoder.type) {
         case DecoderType::NVDEC:
-            return (codecId == AV_CODEC_ID_H264 || codecId == AV_CODEC_ID_HEVC || codecId == AV_CODEC_ID_AV1);
+            return (codecId == AV_CODEC_ID_H264 || codecId == AV_CODEC_ID_HEVC);
         default:
             return false;
     }
@@ -100,7 +100,6 @@ bool HardwareDecoder::TestNVDECAvailability() {
     // Test if we can find NVDEC decoders
     bool h264Available = false;
     bool h265Available = false;
-    bool av1Available = false;
 
     // Check for H264 NVDEC decoder
     const AVCodec* h264Decoder = avcodec_find_decoder_by_name("h264_cuvid");
@@ -116,16 +115,9 @@ bool HardwareDecoder::TestNVDECAvailability() {
         LOG_INFO("H265 NVDEC decoder found");
     }
 
-    // Check for AV1 NVDEC decoder (requires RTX 30 series or newer)
-    const AVCodec* av1Decoder = avcodec_find_decoder_by_name("av1_cuvid");
-    if (av1Decoder) {
-        av1Available = true;
-        LOG_INFO("AV1 NVDEC decoder found");
-    }
-
     av_buffer_unref(&hwDeviceCtx);
 
-    if (h264Available || h265Available || av1Available) {
+    if (h264Available || h265Available) {
         LOG_INFO("NVDEC hardware decoding available");
         return true;
     } else {
