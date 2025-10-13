@@ -1,10 +1,12 @@
 #include <VideoCapture.h>
+#include <Logger.h>
 #include <windows.h>
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <wrl/client.h>
 #include <iostream>
 #include <string>
+#include <algorithm>
 
 using Microsoft::WRL::ComPtr;
 
@@ -74,6 +76,19 @@ struct Vertex {
     float pos[3];
     float tex[2];
 };
+
+// Helper function to parse log level from string
+LogLevel ParseLogLevel(const std::wstring& levelStr) {
+    std::wstring lower = levelStr;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::towlower);
+
+    if (lower == L"error") return LogLevel::Error;
+    if (lower == L"warning") return LogLevel::Warning;
+    if (lower == L"info") return LogLevel::Info;
+    if (lower == L"debug") return LogLevel::Debug;
+
+    return LogLevel::Info; // default
+}
 
 // Window procedure
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -247,13 +262,32 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
 
     if (argc < 2) {
-        MessageBoxA(nullptr, "Usage: simple_player.exe <video_file.mp4>", "Error", MB_OK | MB_ICONERROR);
+        MessageBoxA(nullptr,
+            "Usage: simple_player.exe <video_file.mp4> [options]\n\n"
+            "Options:\n"
+            "  --log-level <level>  Set log level (error, warning, info, debug)\n"
+            "  -l <level>           Short form of --log-level",
+            "Simple Player", MB_OK | MB_ICONINFORMATION);
         return 1;
     }
 
-    // Convert wide string to narrow string
-    std::wstring wideVideoPath(argv[1]);
-    std::string videoPath(wideVideoPath.begin(), wideVideoPath.end());
+    // Parse arguments
+    std::wstring videoPath(argv[1]);
+    LogLevel logLevel = LogLevel::Info; // default
+
+    for (int i = 2; i < argc; i++) {
+        std::wstring arg(argv[i]);
+        if ((arg == L"--log-level" || arg == L"-l") && i + 1 < argc) {
+            logLevel = ParseLogLevel(argv[i + 1]);
+            i++; // skip next argument
+        }
+    }
+
+    // Set log level
+    Logger::GetInstance().SetLogLevel(logLevel);
+
+    // Convert wide string to narrow string for VideoCapture
+    std::string videoPathNarrow(videoPath.begin(), videoPath.end());
 
     // Create window
     WNDCLASSEX wc = {};
@@ -295,8 +329,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 
     // Open video file
-    if (!g_videoCapture.open(videoPath)) {
-        std::string error = "Failed to open video file: " + videoPath;
+    if (!g_videoCapture.open(videoPathNarrow)) {
+        std::string error = "Failed to open video file: " + videoPathNarrow;
         MessageBoxA(nullptr, error.c_str(), "Error", MB_OK | MB_ICONERROR);
         return 1;
     }

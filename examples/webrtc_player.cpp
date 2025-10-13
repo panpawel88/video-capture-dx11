@@ -1,4 +1,5 @@
 #include <VideoCapture.h>
+#include <Logger.h>
 
 #ifdef WEBRTC_SUPPORT_ENABLED
 #include "../src/WebRTCDataSource.h"
@@ -11,6 +12,7 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include <algorithm>
 
 using Microsoft::WRL::ComPtr;
 
@@ -84,6 +86,19 @@ struct Vertex {
     float pos[3];
     float tex[2];
 };
+
+// Helper function to parse log level from string
+LogLevel ParseLogLevel(const std::wstring& levelStr) {
+    std::wstring lower = levelStr;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::towlower);
+
+    if (lower == L"error") return LogLevel::Error;
+    if (lower == L"warning") return LogLevel::Warning;
+    if (lower == L"info") return LogLevel::Info;
+    if (lower == L"debug") return LogLevel::Debug;
+
+    return LogLevel::Info; // default
+}
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
@@ -228,6 +243,35 @@ void Render(ID3D11Texture2D* videoTexture, DXGI_FORMAT format) {
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    // Parse command line for log level option
+    int argc;
+    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+
+    LogLevel logLevel = LogLevel::Info; // default
+
+    for (int i = 1; i < argc; i++) {
+        std::wstring arg(argv[i]);
+        if ((arg == L"--log-level" || arg == L"-l") && i + 1 < argc) {
+            logLevel = ParseLogLevel(argv[i + 1]);
+            i++; // skip next argument
+        } else if (arg == L"--help" || arg == L"-h") {
+            MessageBoxA(nullptr,
+                "Usage: webrtc_player.exe [options]\n\n"
+                "Options:\n"
+                "  --log-level <level>  Set log level (error, warning, info, debug)\n"
+                "  -l <level>           Short form of --log-level\n"
+                "  --help, -h           Show this help message",
+                "WebRTC Player", MB_OK | MB_ICONINFORMATION);
+            LocalFree(argv);
+            return 0;
+        }
+    }
+
+    // Set log level
+    Logger::GetInstance().SetLogLevel(logLevel);
+
+    LocalFree(argv);
+
     // Create window
     WNDCLASSEX wc = {};
     wc.cbSize = sizeof(WNDCLASSEX);
