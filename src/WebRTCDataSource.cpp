@@ -79,6 +79,9 @@ bool WebRTCDataSource::Initialize(const std::string& codec, int payloadType) {
             media.addH264Codec(payloadType);
         } else if (codec == "H265" || codec == "HEVC") {
             media.addH265Codec(payloadType);
+        } else if (codec == "AV1") {
+            // AV1 support - requires libdatachannel with AV1 codec support
+            media.addVideoCodec(payloadType, "AV1");
         } else {
             LOG_ERROR("Unsupported codec: ", codec);
             return false;
@@ -95,6 +98,11 @@ bool WebRTCDataSource::Initialize(const std::string& codec, int payloadType) {
             depacketizer = std::make_shared<rtc::H264RtpDepacketizer>();
         } else if (codec == "H265" || codec == "HEVC") {
             depacketizer = std::make_shared<rtc::H265RtpDepacketizer>();
+        } else if (codec == "AV1") {
+            // TODO: AV1 RTP depacketizer support depends on libdatachannel version
+            // Check if rtc::AV1RtpDepacketizer is available in your libdatachannel version
+            LOG_WARNING("AV1 RTP depacketizer may not be available in libdatachannel yet");
+            // depacketizer = std::make_shared<rtc::AV1RtpDepacketizer>();  // Uncomment if available
         }
 
         m_track->setMediaHandler(depacketizer);

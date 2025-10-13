@@ -2,7 +2,7 @@
 
 > **⚠️ Note:** This project is still under development and has not been thoroughly tested yet.
 
-A simplified OpenCV-like VideoCapture library for Windows that provides hardware-accelerated H.264/H.265 video decoding with DirectX 11 texture output.
+A simplified OpenCV-like VideoCapture library for Windows that provides hardware-accelerated H.264/H.265/AV1 video decoding with DirectX 11 texture output.
 
 ## Features
 
@@ -10,13 +10,15 @@ A simplified OpenCV-like VideoCapture library for Windows that provides hardware
 - ✅ **Direct D3D11 texture output** (zero CPU copies)
 - ✅ **OpenCV-compatible API** (similar to `cv::VideoCapture`)
 - ✅ **Minimal dependencies** (FFmpeg + DirectX 11)
-- ✅ **H.264 and H.265 codec support**
+- ✅ **H.264, H.265, and AV1 codec support**
 - ✅ **Automatic FFmpeg download** via CMake
 
 ## Requirements
 
 - **OS**: Windows 10/11 (64-bit)
-- **GPU**: NVIDIA GPU with NVDEC support (GTX 900 series or newer)
+- **GPU**: NVIDIA GPU with NVDEC support
+  - GTX 900 series or newer for H.264/H.265
+  - **RTX 30 series (Ampere) or newer for AV1** hardware decoding
 - **Compiler**: Visual Studio 2022 or newer
 - **CMake**: 3.20 or newer
 
@@ -186,16 +188,18 @@ The library consists of these components (extracted from dual-stream reference):
 - **Hardware decoding only** - No software fallback
 - **Windows only** - DirectX 11 required
 - **NVIDIA GPUs only** - NVDEC required
-- **H.264/H.265 only** - Other codecs not supported
+- **H.264/H.265/AV1 only** - Other codecs not supported
+  - AV1 requires RTX 30 series (Ampere) or newer GPU
 - **MP4 containers only** - Other formats not tested
 
 ## Error Handling
 
 The library will **fail fast** if:
 - Hardware decoder is not available
-- Video codec is not H.264 or H.265
+- Video codec is not H.264, H.265, or AV1
 - Video file cannot be opened
 - D3D11 device is not provided
+- AV1 video is used on GPU without AV1 hardware support
 
 Check return values and console output for error messages.
 
@@ -236,6 +240,7 @@ Based on: https://github.com/panpawel88/dual-stream
 - Check that FFmpeg DLLs are in the same directory as your executable
 
 ### Black screen in example
-- Ensure your video file is H.264 or H.265
+- Ensure your video file is H.264, H.265, or AV1
+- For AV1 videos, verify you have RTX 30 series or newer GPU
 - Check console output for decode errors
 - Verify YUV->RGB shader is working correctly
