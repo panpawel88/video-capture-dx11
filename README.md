@@ -36,6 +36,8 @@ AV1 hardware decoding requires a GPU with AV1 decode support:
 
 **⚠️ Important:** AV1 support requires a **custom FFmpeg build** with native AV1 decoder. See `docs/BUILD_FFMPEG.md` for instructions. The default FFmpeg download only supports H.264/H.265.
 
+**⚠️ Status:** AV1 hardware decoding support is currently **in progress and not yet fully tested**. The implementation is complete but requires verification with compatible hardware and custom FFmpeg builds.
+
 ## Quick Start
 
 ### Building the Library
