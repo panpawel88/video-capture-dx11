@@ -2,23 +2,39 @@
 
 > **⚠️ Note:** This project is still under development and has not been thoroughly tested yet.
 
-A simplified OpenCV-like VideoCapture library for Windows that provides hardware-accelerated H.264/H.265 video decoding with DirectX 11 texture output.
+A simplified OpenCV-like VideoCapture library for Windows that provides hardware-accelerated H.264/H.265/AV1 video decoding with DirectX 11 texture output.
 
 ## Features
 
-- ✅ **Hardware-accelerated decoding only** (NVIDIA NVDEC)
+- ✅ **Hardware-accelerated decoding only** (D3D11VA - multi-vendor support)
 - ✅ **Direct D3D11 texture output** (zero CPU copies)
 - ✅ **OpenCV-compatible API** (similar to `cv::VideoCapture`)
 - ✅ **Minimal dependencies** (FFmpeg + DirectX 11)
-- ✅ **H.264 and H.265 codec support**
+- ✅ **H.264, H.265, and AV1 codec support**
 - ✅ **Automatic FFmpeg download** via CMake
 
 ## Requirements
 
 - **OS**: Windows 10/11 (64-bit)
-- **GPU**: NVIDIA GPU with NVDEC support (GTX 900 series or newer)
+- **GPU**: Hardware video decoder support required:
+  - **H.264/H.265**: Most modern GPUs (NVIDIA GTX 900+, Intel HD Graphics 4000+, AMD GCN+)
+  - **AV1**: Newer GPUs only (see GPU Requirements for AV1 section below)
 - **Compiler**: Visual Studio 2022 or newer
 - **CMake**: 3.20 or newer
+
+### GPU Requirements for AV1
+
+AV1 hardware decoding requires a GPU with AV1 decode support:
+
+- **NVIDIA**: RTX 30 series (Ampere) or RTX 40 series (Ada)
+  - RTX 3060, 3070, 3080, 3090
+  - RTX 4060, 4070, 4080, 4090
+- **Intel**: Arc series (Alchemist) or newer
+  - Arc A750, A770
+- **AMD**: RX 6000 series or newer
+  - RX 6600, 6700, 6800, 6900
+
+**⚠️ Important:** AV1 support requires a **custom FFmpeg build** with native AV1 decoder. See `docs/BUILD_FFMPEG.md` for instructions. The default FFmpeg download only supports H.264/H.265.
 
 ## Quick Start
 
@@ -185,17 +201,20 @@ The library consists of these components (extracted from dual-stream reference):
 
 - **Hardware decoding only** - No software fallback
 - **Windows only** - DirectX 11 required
-- **NVIDIA GPUs only** - NVDEC required
-- **H.264/H.265 only** - Other codecs not supported
+- **D3D11VA hardware decoder required** - GPU must support D3D11VA for the target codec
+- **H.264/H.265/AV1 only** - Other codecs not supported
+  - AV1 requires custom FFmpeg build and newer GPU (see Requirements)
 - **MP4 containers only** - Other formats not tested
 
 ## Error Handling
 
 The library will **fail fast** if:
 - Hardware decoder is not available
-- Video codec is not H.264 or H.265
+- Video codec is not H.264, H.265, or AV1
 - Video file cannot be opened
 - D3D11 device is not provided
+- GPU doesn't support D3D11VA hardware decoding for the video codec
+- AV1 video used with FFmpeg build lacking native AV1 decoder
 
 Check return values and console output for error messages.
 
@@ -227,15 +246,23 @@ Based on: https://github.com/panpawel88/dual-stream
 ## Troubleshooting
 
 ### "Hardware decoder not available"
-- Ensure you have an NVIDIA GPU with NVDEC
-- Update GPU drivers
-- Check if CUDA is available on your system
+- Ensure your GPU supports D3D11VA hardware decoding
+- For AV1: Check GPU requirements (NVIDIA RTX 30+, Intel Arc, or AMD RX 6000+)
+- Update GPU drivers to the latest version
+- Check console output for specific codec availability messages
 
 ### "Failed to initialize VideoCapture"
 - Ensure you called `VideoCapture::Initialize()` with a valid D3D11 device
 - Check that FFmpeg DLLs are in the same directory as your executable
 
 ### Black screen in example
-- Ensure your video file is H.264 or H.265
+- Ensure your video file is H.264, H.265, or AV1
+- For AV1: Verify your GPU supports AV1 hardware decode (RTX 30+, Intel Arc, AMD RX 6000+)
+- For AV1: Confirm you're using custom FFmpeg build with native AV1 decoder
 - Check console output for decode errors
 - Verify YUV->RGB shader is working correctly
+
+### "AV1 D3D11VA decoder available" not shown
+- FFmpeg build uses libdav1d (software decoder) instead of native decoder
+- Build custom FFmpeg with `--disable-libdav1d --enable-decoder=av1`
+- See `docs/BUILD_FFMPEG.md` for complete instructions

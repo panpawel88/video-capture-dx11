@@ -77,10 +77,10 @@ DecoderInfo HardwareDecoder::GetBestDecoder(AVCodecID codecId) {
 bool HardwareDecoder::SupportsCodec(const DecoderInfo& decoder, AVCodecID codecId) {
     switch (decoder.type) {
         case DecoderType::D3D11VA:
-            // D3D11VA supports H.264 and H.265 (AV1 added in next commit)
-            return (codecId == AV_CODEC_ID_H264 || codecId == AV_CODEC_ID_HEVC);
+            // D3D11VA supports H.264, H.265, and AV1 (hardware dependent)
+            return (codecId == AV_CODEC_ID_H264 || codecId == AV_CODEC_ID_HEVC || codecId == AV_CODEC_ID_AV1);
         case DecoderType::NVDEC:
-            return (codecId == AV_CODEC_ID_H264 || codecId == AV_CODEC_ID_HEVC);
+            return (codecId == AV_CODEC_ID_H264 || codecId == AV_CODEC_ID_HEVC || codecId == AV_CODEC_ID_AV1);
         default:
             return false;
     }
@@ -191,9 +191,11 @@ bool HardwareDecoder::TestD3D11VAAvailability(ID3D11Device* d3dDevice) {
     // Test if standard decoders support D3D11VA
     const AVCodec* h264Decoder = avcodec_find_decoder(AV_CODEC_ID_H264);
     const AVCodec* h265Decoder = avcodec_find_decoder(AV_CODEC_ID_HEVC);
+    const AVCodec* av1Decoder = avcodec_find_decoder(AV_CODEC_ID_AV1);
 
     bool h264Available = false;
     bool h265Available = false;
+    bool av1Available = false;
 
     // Check if H.264 decoder supports D3D11VA
     if (h264Decoder) {
@@ -223,10 +225,24 @@ bool HardwareDecoder::TestD3D11VAAvailability(ID3D11Device* d3dDevice) {
         }
     }
 
+    // Check if AV1 decoder supports D3D11VA
+    if (av1Decoder) {
+        for (int i = 0;; i++) {
+            const AVCodecHWConfig* config = avcodec_get_hw_config(av1Decoder, i);
+            if (!config) break;
+            if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
+                config->device_type == AV_HWDEVICE_TYPE_D3D11VA) {
+                av1Available = true;
+                LOG_INFO("AV1 D3D11VA decoder available");
+                break;
+            }
+        }
+    }
+
     av_buffer_unref(&hwDeviceCtx);
     if (deviceCtx) deviceCtx->Release();
 
-    if (h264Available || h265Available) {
+    if (h264Available || h265Available || av1Available) {
         LOG_INFO("D3D11VA hardware decoding available");
         return true;
     } else {
