@@ -43,35 +43,56 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
-# FFmpeg download configuration using FetchContent
-include(FetchContent)
+# FFmpeg configuration - support custom builds for AV1
+option(USE_CUSTOM_FFMPEG "Use custom FFmpeg build instead of downloading pre-built" OFF)
 
-set(FFMPEG_VERSION "7.1.1")
-set(FFMPEG_URL "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-win64-lgpl-shared-7.1.zip")
+if(USE_CUSTOM_FFMPEG AND DEFINED FFMPEG_DIR)
+    message(STATUS "Using custom FFmpeg from: ${FFMPEG_DIR}")
 
-FetchContent_Declare(
-    FFmpeg
-    URL ${FFMPEG_URL}
-    SOURCE_DIR "${CMAKE_BINARY_DIR}/ffmpeg"
-)
+    # Validate custom FFmpeg directory
+    if(NOT EXISTS "${FFMPEG_DIR}/include/libavcodec/avcodec.h")
+        message(FATAL_ERROR "Invalid FFMPEG_DIR: ${FFMPEG_DIR}\nCannot find: ${FFMPEG_DIR}/include/libavcodec/avcodec.h")
+    endif()
 
-FetchContent_MakeAvailable(FFmpeg)
+    set(FFMPEG_INCLUDE_DIR "${FFMPEG_DIR}/include")
+    set(FFMPEG_LIB_DIR "${FFMPEG_DIR}/lib")
+    set(FFMPEG_BIN_DIR "${FFMPEG_DIR}/bin")
 
-# Set FFmpeg paths
-set(FFMPEG_DIR "${CMAKE_BINARY_DIR}/ffmpeg")
-set(FFMPEG_INCLUDE_DIR "${FFMPEG_DIR}/include")
-set(FFMPEG_LIB_DIR "${FFMPEG_DIR}/lib")
-set(FFMPEG_BIN_DIR "${FFMPEG_DIR}/bin")
+    message(STATUS "Custom FFmpeg paths:")
+    message(STATUS "  Include: ${FFMPEG_INCLUDE_DIR}")
+    message(STATUS "  Library: ${FFMPEG_LIB_DIR}")
+    message(STATUS "  Binary:  ${FFMPEG_BIN_DIR}")
 
-# Find FFmpeg libraries (minimal set for hardware decoding)
-find_library(AVCODEC_LIB avcodec PATHS ${FFMPEG_LIB_DIR} NO_DEFAULT_PATH)
-find_library(AVFORMAT_LIB avformat PATHS ${FFMPEG_LIB_DIR} NO_DEFAULT_PATH)
-find_library(AVUTIL_LIB avutil PATHS ${FFMPEG_LIB_DIR} NO_DEFAULT_PATH)
+else()
+    # Download pre-built FFmpeg (H.264/H.265 only, no AV1)
+    message(STATUS "Downloading pre-built FFmpeg (H.264/H.265 only)")
+    message(STATUS "For AV1 support, build custom FFmpeg and use:")
+    message(STATUS "  cmake -DUSE_CUSTOM_FFMPEG=ON -DFFMPEG_DIR=<path> ...")
+    message(STATUS "See docs/BUILD_FFMPEG.md for instructions")
 
-# Verify FFmpeg libraries were found
-if(NOT AVCODEC_LIB OR NOT AVFORMAT_LIB OR NOT AVUTIL_LIB)
-    message(FATAL_ERROR "Could not find required FFmpeg libraries")
+    include(FetchContent)
+    set(FFMPEG_VERSION "7.1.1")
+    set(FFMPEG_URL "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-win64-lgpl-shared-7.1.zip")
+
+    FetchContent_Declare(
+        FFmpeg
+        URL ${FFMPEG_URL}
+        SOURCE_DIR "${CMAKE_BINARY_DIR}/ffmpeg"
+    )
+
+    FetchContent_MakeAvailable(FFmpeg)
+
+    # Set paths for downloaded FFmpeg
+    set(FFMPEG_DIR "${CMAKE_BINARY_DIR}/ffmpeg")
+    set(FFMPEG_INCLUDE_DIR "${FFMPEG_DIR}/include")
+    set(FFMPEG_LIB_DIR "${FFMPEG_DIR}/lib")
+    set(FFMPEG_BIN_DIR "${FFMPEG_DIR}/bin")
 endif()
+
+# Find FFmpeg libraries (works for both custom and downloaded)
+find_library(AVCODEC_LIB avcodec PATHS ${FFMPEG_LIB_DIR} NO_DEFAULT_PATH REQUIRED)
+find_library(AVFORMAT_LIB avformat PATHS ${FFMPEG_LIB_DIR} NO_DEFAULT_PATH REQUIRED)
+find_library(AVUTIL_LIB avutil PATHS ${FFMPEG_LIB_DIR} NO_DEFAULT_PATH REQUIRED)
 
 # Create FFmpeg target
 add_library(FFmpeg INTERFACE)
@@ -79,9 +100,9 @@ target_include_directories(FFmpeg INTERFACE ${FFMPEG_INCLUDE_DIR})
 target_link_libraries(FFmpeg INTERFACE ${AVCODEC_LIB} ${AVFORMAT_LIB} ${AVUTIL_LIB})
 
 message(STATUS "FFmpeg libraries found:")
-message(STATUS "  avcodec: ${AVCODEC_LIB}")
+message(STATUS "  avcodec:  ${AVCODEC_LIB}")
 message(STATUS "  avformat: ${AVFORMAT_LIB}")
-message(STATUS "  avutil: ${AVUTIL_LIB}")
+message(STATUS "  avutil:   ${AVUTIL_LIB}")
 
 # Library source files
 set(LIBRARY_SOURCES
