@@ -37,7 +37,7 @@ bool VideoDecoder::Initialize(AVCodecParameters* codecParams, const DecoderInfo&
         return false;
     }
 
-    if (decoderInfo.type != DecoderType::NVDEC || !decoderInfo.available) {
+    if ((decoderInfo.type != DecoderType::NVDEC && decoderInfo.type != DecoderType::D3D11VA) || !decoderInfo.available) {
         LOG_ERROR("Hardware decoder not available - only hardware decoding is supported");
         return false;
     }
@@ -200,6 +200,9 @@ bool VideoDecoder::InitializeHardwareDecoder(AVCodecParameters* codecParams) {
     if (!SetupHardwareDecoding()) {
         return false;
     }
+
+    // Set get_format callback to force hardware pixel format (critical!)
+    m_codecContext->get_format = GetHardwareFormat;
 
     // Open codec
     ret = avcodec_open2(m_codecContext, m_codec, nullptr);
@@ -379,6 +382,21 @@ bool VideoDecoder::ExtractD3D11Texture(AVFrame* frame, ComPtr<ID3D11Texture2D>& 
 
     LOG_DEBUG("D3D11 texture extracted successfully from hardware frame");
     return true;
+}
+
+enum AVPixelFormat VideoDecoder::GetHardwareFormat(AVCodecContext* ctx, const enum AVPixelFormat* pix_fmts) {
+    const enum AVPixelFormat* p;
+
+    // Look for D3D11 format in available formats
+    for (p = pix_fmts; *p != AV_PIX_FMT_NONE; p++) {
+        if (*p == AV_PIX_FMT_D3D11) {
+            LOG_DEBUG("Selecting D3D11 hardware pixel format");
+            return *p;
+        }
+    }
+
+    LOG_ERROR("Failed to find D3D11 pixel format in available formats");
+    return AV_PIX_FMT_NONE;
 }
 
 void VideoDecoder::Reset() {

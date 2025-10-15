@@ -7,8 +7,8 @@ FFmpegInitializer::~FFmpegInitializer() {
     }
 }
 
-bool FFmpegInitializer::Initialize() {
-    if (!HardwareDecoder::Initialize()) {
+bool FFmpegInitializer::Initialize(ID3D11Device* d3dDevice) {
+    if (!HardwareDecoder::Initialize(d3dDevice)) {
         return false;
     }
 

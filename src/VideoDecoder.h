@@ -78,5 +78,8 @@ private:
     bool IsHardwareFrame(AVFrame* frame) const;
     bool ExtractD3D11Texture(AVFrame* frame, ComPtr<ID3D11Texture2D>& texture);
 
+    // Hardware format callback
+    static enum AVPixelFormat GetHardwareFormat(AVCodecContext* ctx, const enum AVPixelFormat* pix_fmts);
+
     void Reset();
 };

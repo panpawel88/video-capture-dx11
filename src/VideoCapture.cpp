@@ -37,9 +37,9 @@ bool VideoCapture::Initialize(ID3D11Device* device) {
     s_d3dDevice = device;
     s_d3dDevice->AddRef(); // Keep reference to device
 
-    // Initialize FFmpeg and hardware decoder detection
+    // Initialize FFmpeg and hardware decoder detection with D3D11 device
     static FFmpegInitializer ffmpegInit;
-    if (!ffmpegInit.Initialize()) {
+    if (!ffmpegInit.Initialize(s_d3dDevice)) {
         LOG_ERROR("Failed to initialize FFmpeg");
         return false;
     }
@@ -265,7 +265,7 @@ void VideoCapture::release() {
 bool VideoCapture::InitializeDecoder() {
     // Get decoder info
     DecoderInfo decoderInfo = HardwareDecoder::GetBestDecoder(m_demuxer->GetCodecID());
-    if (decoderInfo.type != DecoderType::NVDEC || !decoderInfo.available) {
+    if ((decoderInfo.type != DecoderType::NVDEC && decoderInfo.type != DecoderType::D3D11VA) || !decoderInfo.available) {
         LOG_ERROR("Hardware decoder not available - only hardware decoding is supported");
         return false;
     }
