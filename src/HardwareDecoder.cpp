@@ -57,17 +57,9 @@ DecoderInfo HardwareDecoder::GetBestDecoder(AVCodecID codecId) {
         return noneDecoder;
     }
 
-    // Prefer D3D11VA (native Windows API, works with all vendors)
+    // Use D3D11VA (native Windows API, works with all vendors)
     for (const auto& decoder : s_availableDecoders) {
         if (decoder.available && decoder.type == DecoderType::D3D11VA &&
-            SupportsCodec(decoder, codecId)) {
-            return decoder;
-        }
-    }
-
-    // Fallback to NVDEC if D3D11VA not available
-    for (const auto& decoder : s_availableDecoders) {
-        if (decoder.available && decoder.type == DecoderType::NVDEC &&
             SupportsCodec(decoder, codecId)) {
             return decoder;
         }
@@ -86,8 +78,6 @@ bool HardwareDecoder::SupportsCodec(const DecoderInfo& decoder, AVCodecID codecI
         case DecoderType::D3D11VA:
             // D3D11VA supports H.264, H.265, and AV1 (hardware dependent)
             return (codecId == AV_CODEC_ID_H264 || codecId == AV_CODEC_ID_HEVC || codecId == AV_CODEC_ID_AV1);
-        case DecoderType::NVDEC:
-            return (codecId == AV_CODEC_ID_H264 || codecId == AV_CODEC_ID_HEVC || codecId == AV_CODEC_ID_AV1);
         default:
             return false;
     }
@@ -96,7 +86,7 @@ bool HardwareDecoder::SupportsCodec(const DecoderInfo& decoder, AVCodecID codecI
 void HardwareDecoder::DetectHardwareDecoders(ID3D11Device* d3dDevice) {
     s_availableDecoders.clear();
 
-    // Test D3D11VA availability (preferred for Windows)
+    // Test D3D11VA availability (native Windows API, works with all vendors)
     if (d3dDevice) {
         DecoderInfo d3d11vaDecoder;
         d3d11vaDecoder.type = DecoderType::D3D11VA;
@@ -104,55 +94,6 @@ void HardwareDecoder::DetectHardwareDecoders(ID3D11Device* d3dDevice) {
         d3d11vaDecoder.hwDeviceType = AV_HWDEVICE_TYPE_D3D11VA;
         d3d11vaDecoder.available = TestD3D11VAAvailability(d3dDevice);
         s_availableDecoders.push_back(d3d11vaDecoder);
-    }
-
-    // Test NVDEC availability (fallback for NVIDIA GPUs)
-    DecoderInfo nvdecDecoder;
-    nvdecDecoder.type = DecoderType::NVDEC;
-    nvdecDecoder.name = "NVIDIA NVDEC";
-    nvdecDecoder.hwDeviceType = AV_HWDEVICE_TYPE_CUDA;
-    nvdecDecoder.available = TestNVDECAvailability();
-    s_availableDecoders.push_back(nvdecDecoder);
-}
-
-bool HardwareDecoder::TestNVDECAvailability() {
-    AVBufferRef* hwDeviceCtx = nullptr;
-
-    // Try to create CUDA hardware device context
-    int ret = av_hwdevice_ctx_create(&hwDeviceCtx, AV_HWDEVICE_TYPE_CUDA, nullptr, nullptr, 0);
-    if (ret < 0) {
-        char errorBuf[AV_ERROR_MAX_STRING_SIZE];
-        av_strerror(ret, errorBuf, sizeof(errorBuf));
-        LOG_INFO("NVDEC not available: Failed to create CUDA device context: ", errorBuf);
-        return false;
-    }
-
-    // Test if we can find NVDEC decoders
-    bool h264Available = false;
-    bool h265Available = false;
-
-    // Check for H264 NVDEC decoder
-    const AVCodec* h264Decoder = avcodec_find_decoder_by_name("h264_cuvid");
-    if (h264Decoder) {
-        h264Available = true;
-        LOG_INFO("H264 NVDEC decoder found");
-    }
-
-    // Check for H265 NVDEC decoder
-    const AVCodec* h265Decoder = avcodec_find_decoder_by_name("hevc_cuvid");
-    if (h265Decoder) {
-        h265Available = true;
-        LOG_INFO("H265 NVDEC decoder found");
-    }
-
-    av_buffer_unref(&hwDeviceCtx);
-
-    if (h264Available || h265Available) {
-        LOG_INFO("NVDEC hardware decoding available");
-        return true;
-    } else {
-        LOG_INFO("NVDEC hardware decoders not found");
-        return false;
     }
 }
 

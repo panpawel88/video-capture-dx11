@@ -265,7 +265,7 @@ void VideoCapture::release() {
 bool VideoCapture::InitializeDecoder() {
     // Get decoder info
     DecoderInfo decoderInfo = HardwareDecoder::GetBestDecoder(m_demuxer->GetCodecID());
-    if ((decoderInfo.type != DecoderType::NVDEC && decoderInfo.type != DecoderType::D3D11VA) || !decoderInfo.available) {
+    if (decoderInfo.type != DecoderType::D3D11VA || !decoderInfo.available) {
         LOG_ERROR("Hardware decoder not available - only hardware decoding is supported");
         return false;
     }

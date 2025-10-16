@@ -37,7 +37,7 @@ bool VideoDecoder::Initialize(AVCodecParameters* codecParams, const DecoderInfo&
         return false;
     }
 
-    if ((decoderInfo.type != DecoderType::NVDEC && decoderInfo.type != DecoderType::D3D11VA) || !decoderInfo.available) {
+    if (decoderInfo.type != DecoderType::D3D11VA || !decoderInfo.available) {
         LOG_ERROR("Hardware decoder not available - only hardware decoding is supported");
         return false;
     }

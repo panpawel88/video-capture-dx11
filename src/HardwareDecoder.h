@@ -13,7 +13,6 @@ struct ID3D11Device;
 
 enum class DecoderType {
     NONE,
-    NVDEC,
     D3D11VA
 };
 
@@ -39,7 +38,6 @@ private:
     static std::vector<DecoderInfo> s_availableDecoders;
 
     static void DetectHardwareDecoders(ID3D11Device* d3dDevice);
-    static bool TestNVDECAvailability();
     static bool TestD3D11VAAvailability(ID3D11Device* d3dDevice);
     static bool QueryD3D11VideoDecoderGUIDs(ID3D11Device* d3dDevice);
 };
