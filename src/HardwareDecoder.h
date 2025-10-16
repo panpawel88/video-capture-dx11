@@ -41,4 +41,5 @@ private:
     static void DetectHardwareDecoders(ID3D11Device* d3dDevice);
     static bool TestNVDECAvailability();
     static bool TestD3D11VAAvailability(ID3D11Device* d3dDevice);
+    static bool QueryD3D11VideoDecoderGUIDs(ID3D11Device* d3dDevice);
 };

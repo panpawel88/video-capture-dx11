@@ -90,9 +90,10 @@ else()
 endif()
 
 # Find FFmpeg libraries (works for both custom and downloaded)
-find_library(AVCODEC_LIB avcodec PATHS ${FFMPEG_LIB_DIR} NO_DEFAULT_PATH REQUIRED)
-find_library(AVFORMAT_LIB avformat PATHS ${FFMPEG_LIB_DIR} NO_DEFAULT_PATH REQUIRED)
-find_library(AVUTIL_LIB avutil PATHS ${FFMPEG_LIB_DIR} NO_DEFAULT_PATH REQUIRED)
+# Note: MSVC-built FFmpeg puts .lib files in bin/, BtbN builds put them in lib/
+find_library(AVCODEC_LIB avcodec PATHS ${FFMPEG_LIB_DIR} ${FFMPEG_BIN_DIR} NO_DEFAULT_PATH REQUIRED)
+find_library(AVFORMAT_LIB avformat PATHS ${FFMPEG_LIB_DIR} ${FFMPEG_BIN_DIR} NO_DEFAULT_PATH REQUIRED)
+find_library(AVUTIL_LIB avutil PATHS ${FFMPEG_LIB_DIR} ${FFMPEG_BIN_DIR} NO_DEFAULT_PATH REQUIRED)
 
 # Create FFmpeg target
 add_library(FFmpeg INTERFACE)

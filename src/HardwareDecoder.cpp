@@ -2,12 +2,19 @@
 #include "Logger.h"
 #include <iostream>
 #include <d3d11.h>
+#include <d3d11_1.h>
+#include <dxva.h>
+#include <wrl/client.h>
+#include <iomanip>
+#include <sstream>
 
 extern "C" {
 #include <libavutil/hwcontext.h>
 #include <libavutil/hwcontext_d3d11va.h>
 #include <libavcodec/avcodec.h>
 }
+
+using Microsoft::WRL::ComPtr;
 
 bool HardwareDecoder::s_initialized = false;
 std::vector<DecoderInfo> HardwareDecoder::s_availableDecoders;
@@ -149,11 +156,64 @@ bool HardwareDecoder::TestNVDECAvailability() {
     }
 }
 
+bool HardwareDecoder::QueryD3D11VideoDecoderGUIDs(ID3D11Device* d3dDevice) {
+    if (!d3dDevice) {
+        return false;
+    }
+
+    // Query ID3D11VideoDevice to enumerate decoder profiles
+    ComPtr<ID3D11VideoDevice> videoDevice;
+    HRESULT hr = d3dDevice->QueryInterface(__uuidof(ID3D11VideoDevice), &videoDevice);
+    if (FAILED(hr)) {
+        return false;
+    }
+
+    UINT profileCount = videoDevice->GetVideoDecoderProfileCount();
+
+    // AV1 Decoder GUID from DXVA spec
+    static const GUID D3D11_DECODER_PROFILE_AV1_VLD_PROFILE0 =
+        {0xb8be4ccb, 0xcf53, 0x46ba, {0x8d, 0x59, 0xd6, 0xb8, 0xa6, 0xda, 0x5d, 0x2a}};
+
+    // Known decoder GUIDs
+    static const GUID D3D11_DECODER_PROFILE_H264_VLD_NOFGT =
+        {0x1b81be68, 0xa0c7, 0x11d3, {0xb9, 0x84, 0x00, 0xc0, 0x4f, 0x2e, 0x73, 0xc5}};
+    static const GUID D3D11_DECODER_PROFILE_HEVC_VLD_MAIN =
+        {0x5b11d51b, 0x2f4c, 0x4452, {0xbc, 0xc3, 0x09, 0xf2, 0xa1, 0x16, 0x0c, 0xc0}};
+
+    bool av1Found = false;
+    bool h264Found = false;
+    bool hevcFound = false;
+
+    for (UINT i = 0; i < profileCount; i++) {
+        GUID profileGuid;
+        hr = videoDevice->GetVideoDecoderProfile(i, &profileGuid);
+        if (SUCCEEDED(hr)) {
+            if (profileGuid == D3D11_DECODER_PROFILE_AV1_VLD_PROFILE0) {
+                av1Found = true;
+            } else if (profileGuid == D3D11_DECODER_PROFILE_H264_VLD_NOFGT) {
+                h264Found = true;
+            } else if (profileGuid == D3D11_DECODER_PROFILE_HEVC_VLD_MAIN) {
+                hevcFound = true;
+            }
+        }
+    }
+
+    LOG_INFO("D3D11 Video Decoder Hardware Support:");
+    LOG_INFO("  H264: ", (h264Found ? "Yes" : "No"));
+    LOG_INFO("  HEVC: ", (hevcFound ? "Yes" : "No"));
+    LOG_INFO("  AV1:  ", (av1Found ? "Yes" : "No"));
+
+    return av1Found;
+}
+
 bool HardwareDecoder::TestD3D11VAAvailability(ID3D11Device* d3dDevice) {
     if (!d3dDevice) {
         LOG_INFO("D3D11VA not available: No D3D11 device provided");
         return false;
     }
+
+    // Query the actual D3D11 Video Device for decoder GUIDs
+    QueryD3D11VideoDecoderGUIDs(d3dDevice);
 
     AVBufferRef* hwDeviceCtx = nullptr;
     AVHWDeviceContext* deviceContext = nullptr;

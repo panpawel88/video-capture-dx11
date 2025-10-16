@@ -101,9 +101,6 @@ This is the critical step. The configuration **disables libdav1d** and **enables
   --enable-d3d11va \
   --enable-dxva2 \
   \
-  --enable-zlib \
-  --enable-iconv \
-  \
   --extra-cflags="-MD" \
   --extra-cxxflags="-MD"
 ```
@@ -124,7 +121,7 @@ This is the critical step. The configuration **disables libdav1d** and **enables
 After running configure, verify AV1 D3D11VA support is enabled:
 
 ```bash
-grep "CONFIG_AV1_D3D11VA_HWACCEL" config.h
+grep "CONFIG_AV1_D3D11VA_HWACCEL" config_components.h
 ```
 
 **Expected output:**
@@ -161,37 +158,7 @@ FFmpeg will be installed to `C:\ffmpeg-av1-d3d11va\`:
 
 ---
 
-## Step 7: Verify Build
-
-Test that AV1 decoder with D3D11VA is available:
-
-```bash
-cd /c/ffmpeg-av1-d3d11va/bin
-./ffmpeg -decoders | grep av1
-./ffmpeg -hwaccels
-```
-
-**Expected output:**
-```
-V..... av1    Alliance for Open Media AV1 (codec av1)
-...
-d3d11va
-dxva2
-```
-
-### Test AV1 Hardware Decoding
-
-```bash
-./ffmpeg -hwaccel d3d11va -hwaccel_output_format d3d11 \
-  -i /path/to/test_av1.mp4 \
-  -f null -
-```
-
-If working correctly, you should see low CPU usage and the decode happening on GPU.
-
----
-
-## Step 8: Use Custom FFmpeg in Your Project
+## Step 7: Use Custom FFmpeg in Your Project
 
 Update your CMake configuration:
 
@@ -225,14 +192,14 @@ cmake --build build --config Release
 **Solution:**
 - Check `config.log` for why av1_decoder was disabled
 - Ensure `--disable-libdav1d` is present in configure command
-- Verify: `grep "av1_decoder" config.h` should show `1`
+- Verify: `grep "CONFIG_AV1_DECODER" config_components.h` should show `1`
 
 ### Build succeeds but still software decoding
 
 **Solution:**
 - Verify av1_d3d11va_hwaccel was compiled:
 ```bash
-grep "av1_d3d11va_hwaccel" config.h
+grep "CONFIG_AV1_D3D11VA_HWACCEL" config_components.h
 ```
 - Should see: `#define CONFIG_AV1_D3D11VA_HWACCEL 1`
 
