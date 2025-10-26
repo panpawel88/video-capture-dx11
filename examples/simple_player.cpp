@@ -7,6 +7,7 @@
 #include <iostream>
 #include <string>
 #include <algorithm>
+#include <cassert>
 
 using Microsoft::WRL::ComPtr;
 
@@ -24,6 +25,13 @@ ComPtr<ID3D11SamplerState> g_samplerState;
 
 VideoCapture g_videoCapture;
 bool g_running = true;
+
+// Vertex buffer adjustment tracking
+bool g_vertexBufferAdjusted = false;
+int g_videoWidth = 0;
+int g_videoHeight = 0;
+int g_textureWidth = 0;
+int g_textureHeight = 0;
 
 // Simple YUV to RGB pixel shader (NV12 format)
 const char* g_pixelShaderYUVCode = R"(
@@ -191,9 +199,10 @@ bool InitD3D11(HWND hwnd, int width, int height) {
     };
 
     D3D11_BUFFER_DESC bd = {};
-    bd.Usage = D3D11_USAGE_DEFAULT;
+    bd.Usage = D3D11_USAGE_DYNAMIC;
     bd.ByteWidth = sizeof(vertices);
     bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
     D3D11_SUBRESOURCE_DATA initData = {};
     initData.pSysMem = vertices;
@@ -335,6 +344,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         return 1;
     }
 
+    // Store video dimensions for vertex buffer adjustment
+    g_videoWidth = static_cast<int>(g_videoCapture.get(CAP_PROP_FRAME_WIDTH));
+    g_videoHeight = static_cast<int>(g_videoCapture.get(CAP_PROP_FRAME_HEIGHT));
+
     std::cout << "Video opened successfully" << std::endl;
     std::cout << "Resolution: " << g_videoCapture.get(CAP_PROP_FRAME_WIDTH) << "x" << g_videoCapture.get(CAP_PROP_FRAME_HEIGHT) << std::endl;
     std::cout << "FPS: " << g_videoCapture.get(CAP_PROP_FPS) << std::endl;
@@ -355,6 +368,52 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         DXGI_FORMAT format;
 
         if (g_videoCapture.read(&texture, isYUV, format)) {
+            // Adjust vertex buffer once on first frame to handle texture padding
+            if (!g_vertexBufferAdjusted && texture) {
+                D3D11_TEXTURE2D_DESC texDesc;
+                texture->GetDesc(&texDesc);
+
+                g_textureWidth = static_cast<int>(texDesc.Width);
+                g_textureHeight = static_cast<int>(texDesc.Height);
+
+                // Calculate texture coordinate adjustment to sample only the content area
+                float texCoordU = static_cast<float>(g_videoWidth) / static_cast<float>(g_textureWidth);
+                float texCoordV = static_cast<float>(g_videoHeight) / static_cast<float>(g_textureHeight);
+
+                // Create adjusted vertices
+                Vertex adjustedVertices[] = {
+                    { { -1.0f,  1.0f, 0.0f }, { 0.0f, 0.0f } },           // Top-left
+                    { {  1.0f,  1.0f, 0.0f }, { texCoordU, 0.0f } },      // Top-right
+                    { {  1.0f, -1.0f, 0.0f }, { texCoordU, texCoordV } }, // Bottom-right
+                    { { -1.0f, -1.0f, 0.0f }, { 0.0f, texCoordV } }       // Bottom-left
+                };
+
+                // Update vertex buffer with adjusted coordinates
+                D3D11_MAPPED_SUBRESOURCE mappedResource;
+                HRESULT hr = g_context->Map(g_vertexBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+                if (SUCCEEDED(hr)) {
+                    memcpy(mappedResource.pData, adjustedVertices, sizeof(adjustedVertices));
+                    g_context->Unmap(g_vertexBuffer.Get(), 0);
+                    g_vertexBufferAdjusted = true;
+
+                    std::cout << "Adjusted vertex buffer for texture padding:" << std::endl;
+                    std::cout << "  Video size: " << g_videoWidth << "x" << g_videoHeight << std::endl;
+                    std::cout << "  Texture size: " << g_textureWidth << "x" << g_textureHeight << std::endl;
+                    std::cout << "  TexCoord adjustment: U=" << texCoordU << ", V=" << texCoordV << std::endl;
+                } else {
+                    std::cerr << "Failed to map vertex buffer for texture adjustment" << std::endl;
+                }
+            } else if (g_vertexBufferAdjusted && texture) {
+                // Verify texture dimensions haven't changed
+                D3D11_TEXTURE2D_DESC texDesc;
+                texture->GetDesc(&texDesc);
+
+                assert(static_cast<int>(texDesc.Width) == g_textureWidth &&
+                       "Texture width changed during playback! This violates the assumption that texture size remains constant.");
+                assert(static_cast<int>(texDesc.Height) == g_textureHeight &&
+                       "Texture height changed during playback! This violates the assumption that texture size remains constant.");
+            }
+
             Render(texture, format);
             if (texture) {
                 texture->Release(); // Release the reference we got from read()
